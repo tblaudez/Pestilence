@@ -1,44 +1,51 @@
 ; SYSCALL
-%define SYSCALL_READ		0
-%define SYSCALL_WRITE		1
-%define SYSCALL_OPEN		2
-%define SYSCALL_CLOSE		3
-%define SYSCALL_FSTAT		5
-%define SYSCALL_MMAP		9
-%define SYSCALL_MUNMAP		11
-%define SYSCALL_FORK		57
-%define SYSCALL_EXIT		60
-%define SYSCALL_GETDENTS	78
-%define SYSCALL_CHMOD		90
-%define SYSCALL_SETSID		112
+%assign SYSCALL_READ		0
+%assign SYSCALL_WRITE		1
+%assign SYSCALL_OPEN		2
+%assign SYSCALL_CLOSE		3
+%assign SYSCALL_FSTAT		5
+%assign SYSCALL_MMAP		9
+%assign SYSCALL_MUNMAP		11
+%assign SYSCALL_MREMAP		25
+%assign SYSCALL_FORK		57
+%assign SYSCALL_EXIT		60
+%assign SYSCALL_FTRUNCATE	77
+%assign SYSCALL_GETDENTS	78
+%assign SYSCALL_CHMOD		90
+%assign SYSCALL_SETSID		112
 
 ; Constant values
 %define PAYLOAD_SIZE		(_end - _start)
 %define VALUE(x)			[(rbp - s_pestilence_size) + x]
-%define	DIRENT_ARR_SIZE		1024
-%define	PATH_MAX			4096
+%assign	DIRENT_ARR_SIZE		1024
+%assign	PATH_MAX			4096
+%define SIGNATURE_SIZE		(processDirectory - signature)
 
 ; File access options
-%define	O_RDONLY			0o0000000
-%define	O_RDWR				0o0000002
-%define	O_DIRECTORY			0o0200000
+%assign	O_RDONLY			0o0000000
+%assign	O_RDWR				0o0000002
+%assign	O_DIRECTORY			0o0200000
 
 ; getdents options
-%define	DT_REG				8
-%define	DT_DIR				4
+%assign	DT_REG				8
+%assign	DT_DIR				4
 
 ; mmap options
-%define	PROT_READ			0x1
-%define	PROT_WRITE			0x2
-%define	MAP_SHARED 			0x01
-%define	MMAP_ERROR          -4095
+%assign	PROT_READ			0x1
+%assign	PROT_WRITE			0x2
+%assign	MAP_SHARED 			0x01
+%assign	MMAP_ERROR          -4095
 
 ; ELF header data for comparisons
-%define	ELF_SYSV			0x00010102464c457f
-%define	ELF_GNU				0x03010102464c457f
-%define	ELF64_AND_DYN		0x00000001003e0003
-%define	ELF64_AND_EXEC		0x00000001003e0002
-%define	SEGMENT_TYPE		0x0000000500000001	; p_flags = (PF_X | PF_R) | p_type = PT_LOAD
+%assign	ELF_SYSV			0x00010102464c457f
+%assign	ELF_GNU				0x03010102464c457f
+%assign	ELF64_AND_DYN		0x00000001003e0003
+%assign	ELF64_AND_EXEC		0x00000001003e0002
+
+; ELF segment data
+%assign	PT_NOTE				0x4
+%assign	PT_LOAD				0x1
+%assign	PAGE_SIZE			0x1000
 
 ; Directory entry structure
 struc	dirent

