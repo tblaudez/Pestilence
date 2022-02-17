@@ -13,6 +13,7 @@
 %assign SYSCALL_GETDENTS	78
 %assign SYSCALL_CHMOD		90
 %assign SYSCALL_PTRACE		101
+%assign SYSCALL_GETRANDOM	318
 
 ; Constant values
 %define PAYLOAD_SIZE		(_end - _start)
@@ -22,6 +23,7 @@
 %assign SIGNATURE_SIZE		35
 %assign DEBUG_MESSAGE_SIZE	9
 %assign DAEMON_NAME_SIZE	6
+%define ENCRYPTION_SIZE		(encryptionEnd - _start.encryptionStart)
 
 ; File access options
 %assign	O_RDONLY			0o0000000

