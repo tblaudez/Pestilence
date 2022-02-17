@@ -21,6 +21,7 @@
 %assign	PATH_MAX			4096
 %assign SIGNATURE_SIZE		35
 %assign DEBUG_MESSAGE_SIZE	9
+%assign DAEMON_NAME_SIZE	6
 
 ; File access options
 %assign	O_RDONLY			0o0000000

