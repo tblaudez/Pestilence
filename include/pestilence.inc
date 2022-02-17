@@ -12,14 +12,13 @@
 %assign SYSCALL_FTRUNCATE	77
 %assign SYSCALL_GETDENTS	78
 %assign SYSCALL_CHMOD		90
-%assign SYSCALL_SETSID		112
 
 ; Constant values
 %define PAYLOAD_SIZE		(_end - _start)
 %define VALUE(x)			[(rbp - s_pestilence_size) + x]
 %assign	DIRENT_ARR_SIZE		1024
 %assign	PATH_MAX			4096
-%define SIGNATURE_SIZE		(processDirectory - signature)
+%assign SIGNATURE_SIZE		35
 
 ; File access options
 %assign	O_RDONLY			0o0000000
