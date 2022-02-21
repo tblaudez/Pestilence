@@ -50,6 +50,15 @@
 %assign	PT_LOAD				0x1
 %assign	PAGE_SIZE			0x1000
 
+; Gas obfuscation macro | Confuse disassembler by adding only 1 byte of a 2 bytes instruction
+; Said byte is skipped using a `jump over next byte` instruction
+; This results in instruction beeing totally wrong when disassembled but correct when executed
+%macro gas_obfuscation 1
+		db 0xEB
+		db 0x01
+		db %1
+%endmacro
+
 ; Directory entry structure
 struc	dirent
 	.d_ino:			resq	1	; 64-bit inode number
