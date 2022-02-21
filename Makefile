@@ -14,16 +14,15 @@ TARGET := Pestilence
 
 AS := nasm
 ASFLAGS ?= -felf64 -I include/
-LDFLAGS ?= -nostdlib -pie
 
-SOURCES := $(shell find src/ -type f -name '*.asm')
+SOURCES := src/pestilence.asm
 OBJECTS := $(SOURCES:.asm=.o)
-HEADERS := include/famine.inc
+HEADERS := include/pestilence.inc
 
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(LD) -o $@ $^
 
 %.o: %.asm
 	$(AS) $(ASFLAGS) $< -o $@
