@@ -22,7 +22,6 @@
 %assign	PATH_MAX			4096
 %assign SIGNATURE_SIZE		35
 %assign DEBUG_MESSAGE_SIZE	9
-%assign DAEMON_NAME_SIZE	6
 %define ENCRYPTION_SIZE		(encryptionEnd - _start.encryptionStart)
 
 ; File access options

